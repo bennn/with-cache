@@ -64,5 +64,3 @@ Wrap your large computations in a thunk and let @racket[with-cache] deal with
   Prefix @racket[filename] with the value of @racket[*current-cache-directory*].
   By contract, this function returns only paths whose parent directory exists.
 }
-
-
