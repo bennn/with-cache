@@ -66,7 +66,7 @@
          (format "[with-cache] Failed to read cachefile '~a', got exception:\n" cachefile)])
     (λ (exn)
       (when log?
-        (printf (string-append message-prefix (exn-message exn))))
+        (printf (string-append message-prefix (exn-message exn) "\n")))
       #f)))
 
 (define (with-cache cache-file thunk #:read [read-proc #f] #:write [write-proc #f])
@@ -80,12 +80,12 @@
                         (read-proc (file->value cache-file)))])
                (and v
                     (when log?
-                      (printf "[with-cache] read from cachefile '~a'" cache-file))
+                      (printf "[with-cache] read from cachefile '~a'\n" cache-file))
                     v)))
         (let ([r (thunk)])
           (when use?
             (when log?
-              (printf "[with-cache] writing cachefile '~a'" cache-file))
+              (printf "[with-cache] writing cachefile '~a'\n" cache-file))
             (with-output-to-file cache-file #:exists 'replace
               (λ () (writeln (write-proc r)))))
           r))))
@@ -94,7 +94,9 @@
   (define keys (*current-cache-keys*))
   (if keys
     (λ (v)
-      (and (equal? (car v) (ref* keys))
+      (and (pair? v)
+           (list? (car v))
+           (equal? (car v) (ref* keys))
            (read-proc (cdr v))))
     read-proc))
 
