@@ -1,0 +1,7 @@
+compiled
+coverage
+
+*\.swp
+*~
+\.\#*
+
