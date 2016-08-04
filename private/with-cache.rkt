@@ -1,0 +1,144 @@
+#lang racket/base
+
+;; lightweight, filesystem-based caching
+
+(require racket/contract)
+(provide
+  *use-cache?*
+  ;; (Parameterof Boolean)
+  ;; When #f, do not read or save caches, ever.
+
+  *with-cache-log?*
+  ;; (Parameterof Boolean)
+  ;; When #f, do not print diagnostic messages
+
+  *current-cache-directory*
+  ;; (Parameterof Path-String)
+  ;; Default directory to save caches in.
+  ;; Used as a prefix to `cache-file`
+
+  *current-cache-keys*
+  ;; (Parameterof (U #f (Listof (Parameterof Any))))
+  ;; List of keys to query when reading/writing the cache
+
+  (contract-out
+    [cachefile
+     (-> path-string? parent-directory-exists?)])
+  ;; Prefix the path string with the current value of `*CACHE-DIRECTORY*`
+
+  (contract-out
+    [with-cache
+     (->* [parent-directory-exists? (-> any)]
+          [#:read (-> any/c any)
+           #:write (-> any/c any)]
+          any)])
+  ;; (->* [Path-String (-> A)] [#:read (-> B A) #:write (-> A B)] A)
+  ;; (with-cache path thunk #:read r #:write w)
+  ;; Checks `path` for a value `r` can interpret; if so returns the interpreted value.
+  ;; Else runs `thunk` and writes the result to `path` using `w`.
+  ;; (Future calls to `with-cache` will likely retrieve this stored value.)
+
+)
+
+(require
+  (only-in racket/file file->value)
+  (only-in racket/path path-only)
+  racket/serialize
+)
+
+;; =============================================================================
+
+(define *use-cache?* (make-parameter #t))
+(define *with-cache-log?* (make-parameter #t))
+(define *current-cache-directory* (make-parameter "./compiled"))
+(define *current-cache-keys* (make-parameter #f))
+
+(define (parent-directory-exists? ps)
+  (and (path-string? ps)
+       (let ([dir (path-only ps)])
+         (and dir (directory-exists? dir)))))
+
+(define (cachefile ps)
+  (build-path (*current-cache-directory*) ps))
+
+(define (cache-read-error cachefile log?) ; (-> Path-String Boolean (-> Exception #f))
+  (let ([message-prefix
+         (format "[with-cache] Failed to read cachefile '~a', got exception:\n" cachefile)])
+    (λ (exn)
+      (when log?
+        (printf (string-append message-prefix (exn-message exn))))
+      #f)))
+
+(define (with-cache cache-file thunk #:read [read-proc #f] #:write [write-proc #f])
+  (let ([read-proc (read/current-keys (or read-proc id))]
+        [write-proc (write/current-keys (or write-proc id))]
+        [log? (*with-cache-log?*)]
+        [use? (*use-cache?*)])
+    (or (and use?
+             (file-exists? cache-file)
+             (let ([v (with-handlers ([exn:fail? (cache-read-error cache-file log?)])
+                        (read-proc (file->value cache-file)))])
+               (and v
+                    (when log?
+                      (printf "[with-cache] read from cachefile '~a'" cache-file))
+                    v)))
+        (let ([r (thunk)])
+          (when use?
+            (when log?
+              (printf "[with-cache] writing cachefile '~a'" cache-file))
+            (with-output-to-file cache-file #:exists 'replace
+              (λ () (writeln (write-proc r)))))
+          r))))
+
+(define (read/current-keys read-proc)
+  (define keys (*current-cache-keys*))
+  (if keys
+    (λ (v)
+      (and (equal? (car v) (ref* keys))
+           (read-proc (cdr v))))
+    read-proc))
+
+(define (write/current-keys write-proc)
+  (define keys (*current-cache-keys*))
+  (if keys
+    (λ (v)
+      (cons (ref* keys) (write-proc v)))
+    write-proc))
+
+(define (id x)
+  x)
+
+(define (ref* param*)
+  (for/list ([param (in-list param*)])
+    (param)))
+
+;; =============================================================================
+
+(module+ test
+  (require rackunit rackunit-abbrevs)
+
+  (let ([x (gensym 'x)]
+        [y (gensym 'y)])
+    (parameterize ([*current-cache-directory* (format "./~a" x)])
+      (check-equal?
+        (cachefile (symbol->string y))
+        (string->path (format "./~a/~a" x y)))))
+
+  (check-equal?
+    ((cache-read-error "tmp" #f) #t)
+    #f)
+
+  (let ([x (gensym 'x)]
+        [y (gensym 'y)])
+    (check-equal?
+      ((write/current-keys (λ (_) x)) y)
+      x)
+    (check-equal?
+      ((read/current-keys (λ (_) y)) x)
+      y))
+
+  (check-equal?
+    (ref* (list *use-cache?* *use-cache?*))
+    '(#t #t))
+
+)
