@@ -31,19 +31,20 @@ Wrap your large computations in a thunk and let @racket[with-cache] deal with
 @section{Parameters}
 
 @defparam[*use-cache?* use-cache? boolean? #:value #t]{
-  Parameter for overriding the behavior of @racket[with-cache].
-  When @racket[#f], nothing is cached and @racket[with-cache] will not read
-   cachefiles.
+  Parameter for disabling @racket[with-cache].
+  When @racket[#f], @racket[with-cache] will not read or write any cachefiles.
 }
 
 @defparam[*with-cache-log?* log? boolean? #:value #t]{
   Parameter to disable @racket[with-cache] diagnostic messages.
   When @racket[#f], calls to @racket[with-cache] will not print information
-   about files read or written to, or even about errors hit while reading cachefiles.
+   about files read or written to, or even about errors reading cachefiles.
+  (Malformed cachefiles are the same as missing cachefiles.)
 }
 
 @defparam[*current-cache-directory* cache-dir boolean? #:value "./compiled"]{
   The value of this parameter is the prefix of paths returned by @racket[cachefile].
+  Another good default is @racket[(find-system-path 'temp-dir)].
 }
 
 @defparam[*current-cache-keys* params (or/c #f (listof parameter?)) #:value #f]{
