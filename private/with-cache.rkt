@@ -80,7 +80,7 @@
                         (read-proc (file->value cache-file)))])
                (and v
                     (when log?
-                      (printf "[with-cache] read from cachefile '~a'\n" cache-file))
+                      (printf "[with-cache] reading cachefile '~a'\n" cache-file))
                     v)))
         (let ([r (thunk)])
           (when use?
@@ -117,7 +117,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit rackunit-abbrevs)
+  (require rackunit)
 
   (let ([x (gensym 'x)]
         [y (gensym 'y)])
