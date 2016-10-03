@@ -2,7 +2,6 @@
 
 ;; lightweight, filesystem-based caching
 
-(require racket/contract)
 (provide
   *use-cache?*
   ;; (Parameterof Boolean)
@@ -21,22 +20,17 @@
   ;; (Parameterof (U #f (Listof (Parameterof Any))))
   ;; List of keys to query when reading/writing the cache
 
-  (contract-out
-    [cachefile
-     (-> path-string? parent-directory-exists?)])
+  cachefile
   ;; Prefix the path string with the current value of `*CACHE-DIRECTORY*`
 
-  (contract-out
-    [with-cache
-     (->* [parent-directory-exists? (-> any)]
-          [#:read (-> any/c any)
-           #:write (-> any/c any)]
-          any)])
+  with-cache
   ;; (->* [Path-String (-> A)] [#:read (-> B A) #:write (-> A B)] A)
   ;; (with-cache path thunk #:read r #:write w)
   ;; Checks `path` for a value `r` can interpret; if so returns the interpreted value.
   ;; Else runs `thunk` and writes the result to `path` using `w`.
   ;; (Future calls to `with-cache` will likely retrieve this stored value.)
+
+  parent-directory-exists?
 
 )
 
