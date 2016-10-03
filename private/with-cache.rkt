@@ -59,7 +59,7 @@
 (define (parent-directory-exists? ps)
   (and (path-string? ps)
        (let ([dir (path-only ps)])
-         (and dir (directory-exists? dir)))))
+         (or (not dir) (directory-exists? dir)))))
 
 (define (cachefile ps)
   (build-path (*current-cache-directory*) ps))
