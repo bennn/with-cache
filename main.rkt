@@ -7,6 +7,7 @@
 (provide
   *use-cache?*
   *with-cache-log?*
+  *with-cache-fasl?*
   *current-cache-directory*
   *current-cache-keys*
 

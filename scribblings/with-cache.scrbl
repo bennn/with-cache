@@ -1,7 +1,7 @@
 #lang scribble/manual
 @require[scribble/eval
          scriblib/footnote
-         (for-label racket/base racket/contract racket/serialize)]
+         (for-label racket/base racket/contract racket/fasl racket/serialize)]
 
 @title[#:tag "top"]{with-cache}
 @author[@hyperlink["https://github.com/bennn"]{Ben Greenman}]
@@ -43,6 +43,13 @@ Wrap your large computations in a thunk and let @racket[with-cache] deal with
   When @racket[#f], calls to @racket[with-cache] will not print information
    about files read or written to, or even about errors reading cachefiles.
   (Malformed cachefiles are the same as missing cachefiles.)
+}
+
+@defparam[*with-cache-fasl?* fasl? boolean? #:value #t]{
+  When @racket[#t], convert data using @racket[sexp->fasl] before writing to a cache file.
+  When @racket[#f], just use @racket[writeln].
+
+  Note that byte strings written using @racket[sexp->fasl] cannot be read by code running a different version of Racket.
 }
 
 @defparam[*current-cache-directory* cache-dir boolean? #:value "./compiled"]{
