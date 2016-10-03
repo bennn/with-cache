@@ -72,9 +72,9 @@
         (printf (string-append message-prefix (exn-message exn) "\n")))
       #f)))
 
-(define (with-cache cache-file thunk #:read [read-proc #f] #:write [write-proc #f])
-  (let ([read-proc (read/current-keys (or read-proc id))]
-        [write-proc (write/current-keys (or write-proc id))]
+(define (with-cache cache-file thunk #:read [read-proc deserialize] #:write [write-proc serialize])
+  (let ([read-proc (read/current-keys read-proc)]
+        [write-proc (write/current-keys write-proc)]
         [log? (*with-cache-log?*)]
         [use? (*use-cache?*)])
     (or (and use?
@@ -114,9 +114,6 @@
     (λ (v)
       (cons (ref* keys) (write-proc v)))
     write-proc))
-
-(define (id x)
-  x)
 
 (define (ref* param*)
   (for/list ([param (in-list param*)])

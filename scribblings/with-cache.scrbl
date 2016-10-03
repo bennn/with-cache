@@ -1,5 +1,7 @@
 #lang scribble/manual
-@require[scribble/eval scriblib/footnote]
+@require[scribble/eval
+         scriblib/footnote
+         (for-label racket/base racket/contract racket/serialize)]
 
 @title[#:tag "top"]{with-cache}
 @author[@hyperlink["https://github.com/bennn"]{Ben Greenman}]
@@ -12,8 +14,8 @@ Wrap your large computations in a thunk and let @racket[with-cache] deal with
 
 @defproc[(with-cache [cache-path path-string?]
                      [thunk (-> any)]
-                     [#:read read-proc (or/c #f (-> any/c any)) #f]
-                     [#:write write-proc (or/c #f (-> any/c any)) #f])
+                     [#:read read-proc (-> any/c any) deserialize]
+                     [#:write write-proc (-> any/c any) serialize])
                      any]{
   If @racket[cache-path] exists, applies @racket[read-proc] to the result of
    @racket[(file->value cache-path)] and returns the result (if non-@racket[#f]).
@@ -23,7 +25,8 @@ Wrap your large computations in a thunk and let @racket[with-cache] deal with
 
   For any value @racket[x], calling @racket[(read-proc (write-proc x))] should
    return @racket[x].
-  Both @racket[read-proc] and @racket[write-proc] default to identity functions.
+
+  @emph{Note:} @racket[read-proc] and @racket[write-proc] are @bold{not} responsible for writing to @racket[cache-path].
 
 }
 
