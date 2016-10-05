@@ -73,6 +73,7 @@
         (printf (string-append message-prefix (exn-message exn) "\n")))
       #f)))
 
+(define-logger with-cache)
 (define (with-cache cache-file thunk #:read [read-proc deserialize] #:write [write-proc serialize])
   (let ([read-proc (read/current-keys read-proc)]
         [write-proc (write/current-keys write-proc)]
@@ -85,12 +86,12 @@
                         (read-proc (call-with-input-file cache-file (if fasl? fasl->s-exp read))))])
                (and v
                     (when log?
-                      (printf "[with-cache] reading cachefile '~a'\n" cache-file))
+                      (log-with-cache-info "reading cachefile '~a'\n" cache-file))
                     v)))
         (let ([r (thunk)])
           (when use?
             (when log?
-              (printf "[with-cache] writing cachefile '~a'\n" cache-file))
+              (log-with-cache-info "writing cachefile '~a'\n" cache-file))
             (with-output-to-file cache-file #:exists 'replace
               (λ ()
                 (displayln
