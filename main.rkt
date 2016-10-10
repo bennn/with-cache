@@ -5,12 +5,19 @@
   with-cache/private/with-cache)
 
 (provide
-  *use-cache?*
-  *with-cache-fasl?*
-  *current-cache-directory*
-  *current-cache-keys*
-
   (contract-out
+    [*use-cache?*
+     (parameter/c boolean?)]
+
+    [*with-cache-fasl?*
+     (parameter/c boolean?)]
+
+    [*current-cache-directory*
+     (parameter/c path-string?)]
+
+    [*current-cache-keys*
+     (parameter/c (listof (or/c parameter? (-> any/c))))]
+
     [cachefile
      (-> path-string? parent-directory-exists?)]
 
