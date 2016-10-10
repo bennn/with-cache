@@ -1,6 +1,8 @@
 #lang scribble/manual
 @require[scribble/eval
          scriblib/footnote
+         pict
+         (only-in racket/math pi)
          (for-label racket/base racket/contract racket/fasl racket/serialize)]
 
 @title[#:tag "top"]{with-cache}
@@ -12,22 +14,94 @@ Simple, filesystem-based caching.
 Wrap your large computations in a thunk and let @racket[with-cache] deal with
  saving and retrieving the result.
 
+Here's a diagram of what's happening in @racket[with-cache]:
+
+@(let* ([val-pict (colorize (text "$" (list 'bold) 50) "ForestGreen")]
+        [ser-pict (cc-superimpose (rectangle 50 50 #:border-color "black" #:border-width 1)
+                                  (text "1101" "Courier" 20))]
+        [lock (filled-rectangle 50 30 #:color "gold" #:border-color "chocolate" #:border-width 2)]
+        [key-pict (cc-superimpose lock ser-pict)]
+        [fil-pict (file-icon 40 50 "bisque")]
+        [arrow-line (hline 130 4)]
+        [head-size 24]
+        [arrows (λ (top bot) (vc-append 44 (vc-append (text top '() 14)
+                                                      (hc-append arrow-line (arrowhead head-size 0)))
+                                           (vc-append (hc-append (arrowhead head-size pi) arrow-line)
+                                                      (text bot '() 15))))]
+        [all (hc-append val-pict (arrows "#:write" "#:read")
+                        ser-pict (arrows "add-keys" "check-keys")
+                        key-pict (arrows "write-data" "read-data")
+                        fil-pict)]
+        )
+  @centered[all])
+
+@itemlist[
+  @item{
+    The @emph{dollar sign} on the left represents a value that is expensive to compute.
+  }
+  @item{
+    The @emph{box} in the left-middle is a serialized version of the expensive value.
+  }
+  @item{
+    The @emph{yellow box} in the right-middle is the serialized data paired with a (yellow) label.
+  }
+  @item{
+    The @emph{file symbol} on the right represents a location on the filesystem.
+  }
+]
+
+The @racket[with-cache] function implements this pipeline and provides hooks for controlling the interesting parts.
+@itemlist[
+  @item{
+    @racket[#:write] and @racket[#:read] are optional arguments to @racket[with-cache].
+    They default to @racket[serialize] and @racket[deserialize].
+  }
+  @item{
+    @racket[add-keys] and @racket[check-keys] are hidden functions.
+    The parameter @racket[*current-cache-keys*] declares the keys.
+  }
+  @item{
+    @racket[write-data] and @racket[read-data] are @racket[sexp->fasl] and @racket[fasl->sexp] when the parameter @racket[*with-cache-fasl?*] is @racket[#t].
+    Otherwise, these functions are @racket[write] and @racket[read].
+  }
+]
+
+
 @defproc[(with-cache [cache-path path-string?]
                      [thunk (-> any)]
                      [#:read read-proc (-> any/c any) deserialize]
                      [#:write write-proc (-> any/c any) serialize])
                      any]{
-  If @racket[cache-path] exists, applies @racket[read-proc] to the result of
-   @racket[(file->value cache-path)] and returns the result (if non-@racket[#f]).
-  If @racket[cache-path] does not exist or @racket[read-proc] returns @racket[#f],
-   executes @racket[thunk] and saves the result of @racket[(write-proc (thunk))]
-   to @racket[cache-path] for future calls to retrieve.
+  If @racket[cache-path] exists:
+  @nested[#:style 'inset]{@itemlist[#:style 'ordered
+    @item{
+      reads the contents of @racket[cache-path] (using @racket[sexp->fasl] if @racket[*with-cache-fasl?*] is @racket[#t] and @racket[read] otherwise);
+    }
+    @item{
+      checks whether the result contains keys matching @racket[*current-cache-keys*];
+    }
+    @item{
+      if so, removes the keys and deserializes a value.
+    }
+  ]}
+  If @racket[cache-path] does not exist or contains invalid data:
+  @nested[#:style 'inset]{@itemlist[#:style 'ordered
+    @item{
+      executes @racket[thunk], obtains result @racket[r];
+    }
+    @item{
+      retrieves the values of @racket[*current-cache-keys*];
+    }
+    @item{
+      saves the keys and @racket[r] to @racket[cache-path];
+    }
+    @item{
+      returns @racket[r]
+    }
+  ]}
 
-  For any value @racket[x], calling @racket[(read-proc (write-proc x))] should
-   return @racket[x].
-
-  @emph{Note:} @racket[read-proc] and @racket[write-proc] are @bold{not} responsible for writing to @racket[cache-path].
-
+  Diagnostic information is logged under the @racket[with-cache] topic.
+  To see logging information, use @tt{racket -W with-cache <file.rkt>}.
 }
 
 
@@ -38,16 +112,9 @@ Wrap your large computations in a thunk and let @racket[with-cache] deal with
   When @racket[#f], @racket[with-cache] will not read or write any cachefiles.
 }
 
-@defparam[*with-cache-log?* log? boolean? #:value #t]{
-  Parameter to disable @racket[with-cache] diagnostic messages.
-  When @racket[#f], calls to @racket[with-cache] will not print information
-   about files read or written to, or even about errors reading cachefiles.
-  (Malformed cachefiles are the same as missing cachefiles.)
-}
-
 @defparam[*with-cache-fasl?* fasl? boolean? #:value #t]{
-  When @racket[#t], convert data using @racket[sexp->fasl] before writing to a cache file.
-  When @racket[#f], just use @racket[writeln].
+  When @racket[#t], write files in @tt{fasl} format.
+  Otherwise, write files with @racket[write].
 
   Note that byte strings written using @racket[sexp->fasl] cannot be read by code running a different version of Racket.
 }
@@ -58,14 +125,16 @@ Wrap your large computations in a thunk and let @racket[with-cache] deal with
 }
 
 @defparam[*current-cache-keys* params (or/c #f (listof parameter?)) #:value #f]{
-  List of parameters (or thunks) to validate cachefiles with.
-  When non-@racket[#f], writes by @racket[with-cache] store the value of each
-   parameter in the list along with the cached data.
-  Reads by @racket[with-cache] assert that the current value of each parameter
-   matches the values written to the cachefile.
+  List of parameters or thunks to validate cachefiles with.
+  The values in @racket[*current-cache-keys*] are @emph{computations}.
+  We run these computations once before writing a cache file and save the result.
+  We run these computations again when reading the cache file; if the new results match the saved results, the cache file is valid.
+  Otherwise, the cache file is outdated and @racket[with-cache] will discard it.
 
   For example, @racket[(*current-cache-keys* (list current-seconds))] causes
    @racket[with-cache] to ignore cachefiles written more than 1 second ago.
+
+  By default, the only key is a thunk that retrieves the installed version of the @racket[with-cache] package.
 }
 
 
