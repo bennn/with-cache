@@ -42,15 +42,19 @@
   (only-in racket/date date-display-format current-date date->string)
   (only-in racket/serialize serialize deserialize)
   (only-in racket/port open-output-nowhere)
+  (only-in setup/getinfo get-info)
   racket/fasl
 )
 
 ;; =============================================================================
 
+(define (get-package-version)
+  ((get-info '("with-cache")) 'version))
+
 (define *use-cache?* (make-parameter #t))
 (define *with-cache-fasl?* (make-parameter #t))
 (define *current-cache-directory* (make-parameter "./compiled"))
-(define *current-cache-keys* (make-parameter #f))
+(define *current-cache-keys* (make-parameter (list get-package-version)))
 
 (define-logger with-cache)
 
@@ -72,9 +76,12 @@
              (file-exists? cache-file)
              (with-handlers ([exn:fail? (cache-read-error cache-file)])
                (log-with-cache-info "reading cachefile '~a'...~n" cache-file)
-               (begin0
-                 (read-proc (call-with-input-file cache-file (if fasl? fasl->s-exp read)))
-                 (log-with-cache-info "successfully read cachefile '~a'~n" cache-file))))
+               (cond
+                [(read-proc (call-with-input-file cache-file (if fasl? fasl->s-exp read)))
+                 => (λ (read-val)
+                      (log-with-cache-info "successfully read cachefile '~a'~n" cache-file)
+                      read-val)]
+                [else #f])))
         ;; -- write new cachefile
         (let ([r (thunk)])
           (when use?
@@ -143,7 +150,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit racket/string racket/logging)
+  (require rackunit racket/string racket/logging version/utils)
 
   (define ccm (current-continuation-marks))
 
@@ -233,5 +240,8 @@
     (check-equal?
       (keys->vals (list (λ () v0) (λ () v1)))
       (list v0 v1)))
+
+  (test-case "get-package-version"
+    (check-true (valid-version? (get-package-version))))
 
 )
