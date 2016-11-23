@@ -34,6 +34,9 @@
   ;; (parent-directory-exists? ps)
   ;; Returns #t if `(path-only ps)` exists on the filesystem or is #f
 
+  with-cache-logger
+  ;; Logger
+  ;; Your trusted source for information about the inner workings of `with-cache`
 )
 
 (require
@@ -51,9 +54,11 @@
 (define (get-package-version)
   ((get-info '("with-cache")) 'version))
 
+(define null-dir (gensym 'uninitialized))
+
 (define *use-cache?* (make-parameter #t))
 (define *with-cache-fasl?* (make-parameter #t))
-(define *current-cache-directory* (make-parameter "./compiled"))
+(define *current-cache-directory* (make-parameter null-dir))
 (define *current-cache-keys* (make-parameter (list get-package-version)))
 
 (define-logger with-cache)
@@ -61,7 +66,18 @@
 ;; -----------------------------------------------------------------------------
 
 (define (cachefile ps)
-  (build-path (*current-cache-directory*) ps))
+  (if (not (eq? (*current-cache-directory*) null-dir))
+    (build-path (*current-cache-directory*) ps)
+    (let* ([cwd (current-directory)]
+           [compiled (build-path cwd "compiled")]
+           [wc (build-path compiled "with-cache")])
+      (cond
+       [(not (directory-exists? compiled))
+        (build-path cwd ps)]
+       [else
+        (unless (directory-exists? wc)
+          (make-directory wc))
+        (build-path wc ps)]))))
 
 (define (with-cache cache-file thunk #:read [read-proc deserialize] #:write [write-proc serialize])
   (let* (;; read parameters
@@ -75,11 +91,11 @@
         (and use?
              (file-exists? cache-file)
              (with-handlers ([exn:fail? (cache-read-error cache-file)])
-               (log-with-cache-info "reading cachefile '~a'...~n" cache-file)
+               (log-with-cache-info "reading cachefile '~a'..." cache-file)
                (cond
                 [(read-proc (call-with-input-file cache-file (if fasl? fasl->s-exp read)))
                  => (λ (read-val)
-                      (log-with-cache-info "successfully read cachefile '~a'~n" cache-file)
+                      (log-with-cache-info "successfully read cachefile '~a'" cache-file)
                       read-val)]
                 [else #f])))
         ;; -- write new cachefile
@@ -88,7 +104,7 @@
             (define val-to-write
               (with-handlers ([exn:fail? (λ (exn) (raise-user-error 'with-cache "Internal error: failed to make writable value from result '~a'" r))])
                 (write-proc r)))
-            (log-with-cache-info "writing cachefile '~a'~n" cache-file)
+            (log-with-cache-info "writing cachefile '~a'" cache-file)
             (with-handlers ([exn:fail? (cache-write-error cachefile)])
               (with-output-to-file cache-file #:exists 'replace
                 (λ ()
@@ -97,7 +113,7 @@
                   (if fasl?
                       (s-exp->fasl val-to-write (current-output-port))
                       (writeln val-to-write))
-                  (log-with-cache-info "successfully wrote to cachefile '~a'~n" cache-file)))))
+                  (log-with-cache-info "successfully wrote to cachefile '~a'" cache-file)))))
           r))))
 
 (define (parent-directory-exists? ps)
@@ -150,7 +166,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit racket/string racket/logging version/utils)
+  (require rackunit racket/string racket/logging racket/port version/utils)
 
   (define ccm (current-continuation-marks))
 
@@ -163,7 +179,19 @@
   (define cachefile1 "foo/bar/tmp.dat")
   (define cachefile/no-parent "with-cache-test.dat")
 
-  (define test-recv (make-log-receiver with-cache-logger 'error))
+  (define (intercept-with-cache-log thunk [level 'info])
+    (define inbox (make-hasheq '((debug . ()) (info . ()) (warning . ()) (error . ()) (fatal . ()))))
+    (with-intercepted-logging
+      (λ (l)
+        (define lvl (vector-ref l 0))
+        (define msg (vector-ref l 1))
+        (when (eq? 'with-cache (vector-ref l 3))
+          (hash-set! inbox lvl (cons msg (hash-ref inbox lvl))))
+        (void))
+      thunk
+      #:logger with-cache-logger
+      level)
+    inbox)
 
   (test-case "exn->string"
     (define (check-exn->string msg exn)
@@ -175,12 +203,18 @@
     (check-exn->string msg1 exn1)
     (check-exn->string msg/filesystem exn/filesystem))
 
+  ;; TODO test passes, but prints to the default logger. No bueno.
   (test-case "cache-read-error"
-    ;; TODO will block if `test-recv` doesn't get event
 
     (define (check-cache-read-error cachefile exn)
-      (check-false ((cache-read-error cachefile) exn))
-      (define msg (vector-ref (sync test-recv) 1))
+      (define logs
+        (intercept-with-cache-log
+          (lambda ()
+            (check-false ((cache-read-error cachefile) exn)))
+          'error))
+      (define errs (hash-ref logs 'error))
+      (check-equal? (length errs) 1)
+      (define msg (car errs))
       (check-true (string-contains? msg "Failed to read"))
       (check-true (string-contains? msg cachefile))
       (check-true (string-contains? msg (exn-message exn))))
@@ -189,11 +223,16 @@
     (check-cache-read-error cachefile1 exn/filesystem))
 
   (test-case "cache-write-error"
-    ;; TODO will block if `test-recv` doesn't get event
 
     (define (check-cache-write-error cachefile exn)
-      (check-false ((cache-write-error cachefile) exn))
-      (define msg (vector-ref (sync test-recv) 1))
+      (define logs
+        (intercept-with-cache-log
+          (lambda ()
+            (check-false ((cache-write-error cachefile) exn)))
+          'error))
+      (define errs (hash-ref logs 'error))
+      (check-equal? (length errs) 1)
+      (define msg (car errs))
       (check-true (string-contains? msg "Failed to write"))
       (check-true (string-contains? msg cachefile))
       (check-true (string-contains? msg (exn-message exn))))

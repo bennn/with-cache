@@ -6,6 +6,9 @@
 
 (provide
   (contract-out
+    [with-cache-logger
+     logger?]
+
     [*use-cache?*
      (parameter/c boolean?)]
 

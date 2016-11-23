@@ -3,7 +3,8 @@
          scriblib/footnote
          pict
          (only-in racket/math pi)
-         (for-label racket/base racket/contract racket/fasl racket/serialize)]
+         with-cache
+         (for-label with-cache racket/base racket/contract racket/fasl racket/serialize)]
 
 @title[#:tag "top"]{with-cache}
 @author[@hyperlink["https://github.com/bennn"]{Ben Greenman}]
@@ -13,6 +14,12 @@
 Simple, filesystem-based caching.
 Wrap your large computations in a thunk and let @racket[with-cache] deal with
  saving and retrieving the result.
+
+@racketblock[
+  (define fish
+    (with-cache (cachefile "stdfish.rktd")
+      (λ () (standard-fish 100 50))))
+]
 
 Here's a diagram of what's happening in @racket[with-cache]:
 
@@ -119,7 +126,7 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
   Note that byte strings written using @racket[sexp->fasl] cannot be read by code running a different version of Racket.
 }
 
-@defparam[*current-cache-directory* cache-dir boolean? #:value "./compiled"]{
+@defparam[*current-cache-directory* cache-dir boolean? #:value "./compiled/with-cache"]{
   The value of this parameter is the prefix of paths returned by @racket[cachefile].
   Another good default is @racket[(find-system-path 'temp-dir)].
 }
@@ -134,7 +141,21 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
   For example, @racket[(*current-cache-keys* (list current-seconds))] causes
    @racket[with-cache] to ignore cachefiles written more than 1 second ago.
 
+  @(begin #reader scribble/comment-reader
+  (racketblock
+    (define (fresh-fish)
+      (parameterize ([*current-cache-keys* (list current-seconds)])
+        (with-cache (cachefile "stdfish.rktd")
+          (λ () (standard-fish 100 50)))))
+
+    (fresh-fish) ;; Writes to "compiled/with-cache/stdfish.rktd"
+    (fresh-fish) ;; Reads from "compiled/with-cache/stdfish.rktd"
+    (sleep 1)
+    (fresh-fish) ;; Writes to "compiled/with-cache/stdfish.rktd"
+  ))
+
   By default, the only key is a thunk that retrieves the installed version of the @racket[with-cache] package.
+
 }
 
 
@@ -143,4 +164,9 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
 @defproc[(cachefile [filename path-string?]) path-string?]{
   Prefix @racket[filename] with the value of @racket[*current-cache-directory*].
   By contract, this function returns only paths whose parent directory exists.
+}
+
+@defthing[with-cache-logger logger?]{
+  A @tech[#:doc '(lib "scribblings/reference/reference.scrbl")]{logger} that reports events from the @racket[with-cache] library.
+  Logs @racket['info] events when reading or writing caches and @racket['error] events after detecting corrupted cache files.
 }
