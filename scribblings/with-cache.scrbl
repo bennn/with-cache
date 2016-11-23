@@ -68,7 +68,7 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
     The parameter @racket[*current-cache-keys*] declares the keys.
   }
   @item{
-    @racket[write-data] and @racket[read-data] are @racket[sexp->fasl] and @racket[fasl->sexp] when the parameter @racket[*with-cache-fasl?*] is @racket[#t].
+    @racket[write-data] and @racket[read-data] are @racket[s-exp->fasl] and @racket[fasl->s-exp] when the parameter @racket[*with-cache-fasl?*] is @racket[#t].
     Otherwise, these functions are @racket[write] and @racket[read].
   }
 ]
@@ -82,7 +82,7 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
   If @racket[cache-path] exists:
   @nested[#:style 'inset]{@itemlist[#:style 'ordered
     @item{
-      reads the contents of @racket[cache-path] (using @racket[sexp->fasl] if @racket[*with-cache-fasl?*] is @racket[#t] and @racket[read] otherwise);
+      reads the contents of @racket[cache-path] (using @racket[s-exp->fasl] if @racket[*with-cache-fasl?*] is @racket[#t] and @racket[read] otherwise);
     }
     @item{
       checks whether the result contains keys matching @racket[*current-cache-keys*];
@@ -123,7 +123,7 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
   When @racket[#t], write files in @tt{fasl} format.
   Otherwise, write files with @racket[write].
 
-  Note that byte strings written using @racket[sexp->fasl] cannot be read by code running a different version of Racket.
+  Note that byte strings written using @racket[s-exp->fasl] cannot be read by code running a different version of Racket.
 }
 
 @defparam[*current-cache-directory* cache-dir boolean? #:value "./compiled/with-cache"]{
