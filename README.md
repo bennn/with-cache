@@ -7,16 +7,18 @@ with-cache
 Simple, filesystem-based caching.
 
 0. Pick a directory to store caches in.
-   By default, it's the `./compiled` directory.
+   By default, it's the `./compiled/with-cache` directory.
 1. Wrap "expensive" computations in a thunk, call the thunk via `with-cache`.
 2. Results of the expensive computation are automatically stored and retrieved.
 
 Example:
 ```
-(with-cache "fact42.rktd" (λ () (factorial 42)))
-(with-cache "pict.rktd" (λ () (plot-pict ....))
-            #:read deserialize
-            #:write serialize)
+(with-cache "fact42.rktd"
+  (λ () (factorial 42)))
+(with-cache "pict.rktd"
+  (λ () (standard-fish 100 50))
+  #:read deserialize
+  #:write serialize)
 ```
 
 
