@@ -4,6 +4,9 @@
   racket/contract
   with-cache/private/with-cache)
 
+(define keys/c
+  (listof (or/c parameter? (-> any/c))))
+
 (provide
   (contract-out
     [with-cache-logger
@@ -19,13 +22,16 @@
      (parameter/c path-string?)]
 
     [*current-cache-keys*
-     (parameter/c (listof (or/c parameter? (-> any/c))))]
+     (parameter/c keys/c)]
 
     [cachefile
      (-> path-string? parent-directory-exists?)]
 
     [with-cache
      (->* [parent-directory-exists? (-> any)]
-          [#:read (-> any/c any)
+          [#:use-cache? boolean?
+           #:fasl? boolean?
+           #:keys keys/c
+           #:read (-> any/c any)
            #:write (-> any/c any)]
           any)]))

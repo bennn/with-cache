@@ -77,7 +77,10 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
 @defproc[(with-cache [cache-path path-string?]
                      [thunk (-> any)]
                      [#:read read-proc (-> any/c any) deserialize]
-                     [#:write write-proc (-> any/c any) serialize])
+                     [#:write write-proc (-> any/c any) serialize]
+                     [#:use-cache? use-cache? boolean? (*use-cache?*)]
+                     [#:fasl? fasl? boolean? (*with-cache-fasl?*)]
+                     [#:keys keys (or/c #f (listof (or/c parameter? (-> any/c)))) (*current-cache-keys*)])
                      any]{
   If @racket[cache-path] exists:
   @nested[#:style 'inset]{@itemlist[#:style 'ordered
@@ -131,7 +134,7 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
   Another good default is @racket[(find-system-path 'temp-dir)].
 }
 
-@defparam[*current-cache-keys* params (or/c #f (listof parameter?)) #:value #f]{
+@defparam[*current-cache-keys* params (or/c #f (listof (or/c parameter? (-> any/c)))) #:value #f]{
   List of parameters or thunks to validate cachefiles with.
   The values in @racket[*current-cache-keys*] are @emph{computations}.
   We run these computations once before writing a cache file and save the result.

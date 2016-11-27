@@ -26,9 +26,11 @@
   ;; Prefix the path string `ps` with the current value of `*CACHE-DIRECTORY*`
 
   with-cache
-  ;; (with-cache path thunk #:read r #:write w)
+  ;; (with-cache path thunk #:read r #:write w #:use-cache? c #:fasl? f #:keys k*)
   ;; Checks `path` for a value `r` can interpret; if so returns the interpreted value.
   ;; Else runs `thunk` and writes the result to `path` using `w`.
+  ;; Optional arguments (#:use-cache? #:fasl? #:keys) override the default values
+  ;;  for the (*use-cache?* *with-cache-fasl?* *current-cache-keys*) parameters
 
   parent-directory-exists?
   ;; (parent-directory-exists? ps)
@@ -55,6 +57,7 @@
   ((get-info '("with-cache")) 'version))
 
 (define null-dir (gensym 'uninitialized))
+(define no-keys (string->symbol (string-append "no-keys:" (get-package-version))))
 
 (define *use-cache?* (make-parameter #t))
 (define *with-cache-fasl?* (make-parameter #t))
@@ -63,10 +66,16 @@
 
 (define-logger with-cache)
 
+(define (null-dir? x)
+  (eq? x null-dir))
+
+(define (no-keys? x)
+  (eq? x no-keys))
+
 ;; -----------------------------------------------------------------------------
 
 (define (cachefile ps)
-  (if (not (eq? (*current-cache-directory*) null-dir))
+  (if (not (null-dir? (*current-cache-directory*)))
     (build-path (*current-cache-directory*) ps)
     (let* ([cwd (current-directory)]
            [compiled (build-path cwd "compiled")]
@@ -79,12 +88,14 @@
           (make-directory wc))
         (build-path wc ps)]))))
 
-(define (with-cache cache-file thunk #:read [read-proc deserialize] #:write [write-proc serialize])
-  (let* (;; read parameters
-         [use? (*use-cache?*)]
-         [fasl? (*with-cache-fasl?*)]
-         [keys (*current-cache-keys*)]
-         ;; resolve read&write functions
+(define (with-cache cache-file
+                    thunk
+                    #:use-cache? [use? (*use-cache?*)]
+                    #:fasl? [fasl? (*with-cache-fasl?*)]
+                    #:keys [keys (*current-cache-keys*)]
+                    #:read [read-proc deserialize]
+                    #:write [write-proc serialize])
+  (let* (;; resolve read&write functions
          [read-proc (read/keys read-proc keys)]
          [write-proc (write/keys write-proc keys)])
     (or ;; -- read from cachefile
@@ -124,7 +135,7 @@
 ;; -----------------------------------------------------------------------------
 
 (define (exn->string exn)
-  (format "got exception:~n~a~n" (exn-message exn)))
+  (format "got exception:~n~a" (exn-message exn)))
 
 (define (cache-read-error cachefile) ; (-> Path-String (-> Exception #f))
   (define msg-prefix (format "Failed to read cachefile '~a'" cachefile))
@@ -151,13 +162,17 @@
            (list? (car v))
            (equal? (car v) (keys->vals keys))
            (read-proc (cdr v))))
-    read-proc))
+    (λ (v)
+      (and (pair? v)
+           (no-keys? (car v))
+           (read-proc (cdr v))))))
 
 (define (write/keys write-proc keys)
   (if (and keys (not (null? keys)))
     (λ (v)
       (cons (keys->vals keys) (write-proc v)))
-    write-proc))
+    (λ (v)
+      (cons no-keys (write-proc v)))))
 
 (define (keys->vals key-thunks)
   (for/list ([t (in-list key-thunks)])
@@ -246,11 +261,15 @@
 
     (check-equal?
       ((write/keys (λ (_) x) (list)) y)
+      (cons no-keys x))
+
+    (check-equal?
+      ((read/keys (λ (_) x) (list)) (cons no-keys y))
       x)
 
     (check-equal?
       ((read/keys (λ (_) x) (list)) y)
-      x))
+      #f))
 
   (test-case "read+write/keys:some-keys"
     (define x (gensym 'x))

@@ -19,21 +19,30 @@
     (when (file-exists? f)
       (delete-file f)))
 
+  ;; Return 3 values:
+  ;; - (Boxof Natural), counts the number of calls to the 2nd return value
+  ;; - (-> Symbol), a thunk that simulates writing to a cache
+  ;; - Symbol, the return value of the thunk
+  (define (make-counter)
+    (define num-calls (box 0))
+    (define result (gensym '$$$))
+    (define (f)
+      (set-box! num-calls (+ (unbox num-calls) 1))
+      result)
+    (values num-calls f result))
+
+  ;; ---------------------------------------------------------------------------
+
   (test-case "with-cache:cwd"
     ;; TODO always prints to an error port, because list of *current-cache-keys*
     ;;  is changing for each invocation
     (reset-file! data1)
 
-    (define num-calls (box 0))
-    (define result '$$$)
-
-    (define (f)
-      (set-box! num-calls (+ (unbox num-calls) 1))
-      result)
+    (define-values (num-calls f result) (make-counter))
 
     (define v0 (with-cache data1 f))
-    (check-equal? v0 (with-cache data1 f))
-    (check-equal? v0 result)
+    (check-equal? (symbol->string v0) (symbol->string (with-cache data1 f)))
+    (check-equal? (symbol->string v0) (symbol->string result))
     (check-equal? (unbox num-calls) 1)
 
     (define v1
@@ -49,15 +58,10 @@
     (check-equal? (unbox num-calls) 3)
   )
 
-  (test-case "with-cache:*use-cache?*=#f"
+  (test-case "with-cache:*use-cache?*=#f/parameter"
     (reset-file! data1)
 
-    (define num-calls (box 0))
-    (define result (gensym 'result))
-
-    (define (f)
-      (set-box! num-calls (+ (unbox num-calls) 1))
-      result)
+    (define-values (num-calls f result) (make-counter))
 
     (parameterize ([*use-cache?* #f])
       (check-equal? (with-cache data1 f) result)
@@ -65,12 +69,33 @@
       (check-equal? (with-cache data1 f) result)
       (check-equal? (unbox num-calls) 2)))
 
-  (test-case "with-cache:fasl=#t"
+  (test-case "with-cache:*use-cache?*=#f/keyword"
+    (reset-file! data1)
+
+    (define-values (num-calls f result) (make-counter))
+
+    (check-equal? (with-cache data1 f #:use-cache? #f) result)
+    (check-false (file-exists? data1))
+    (check-equal? (with-cache data1 f #:use-cache? #f) result)
+    (check-equal? (unbox num-calls) 2))
+
+  (test-case "with-cache:fasl=#t/parameter"
     (reset-file! data1)
 
     (check-false (file-exists? data1))
     (parameterize ([*with-cache-fasl?* #t])
       (with-cache data1 (λ () 4)))
+    (check-true (file-exists? data1))
+
+    (with-handlers ([exn:fail:read? void])
+      (with-input-from-file data1 read)
+      (raise-user-error 'with-cache:test "Error: `read` should have failed.")))
+
+  (test-case "with-cache:fasl=#t/keyword"
+    (reset-file! data1)
+
+    (check-false (file-exists? data1))
+    (with-cache data1 (λ () 4) #:fasl? #t)
     (check-true (file-exists? data1))
 
     (with-handlers ([exn:fail:read? void])
@@ -115,12 +140,7 @@
   (test-case "with-cache:subdir"
     (reset-file! data2)
 
-    (define result 'hello-world)
-    (define num-calls (box 0))
-
-    (define (f)
-      (set-box! num-calls (+ (unbox num-calls) 1))
-      result)
+    (define-values (num-calls f result) (make-counter))
 
     (define v0
       (parameterize ([*current-cache-directory* with-cache-subdir])
@@ -146,6 +166,73 @@
           (with-cache "test.rktd"
             (λ () (non-serializable-structure-with-long-name))))))
 
-    (check-regexp-match #rx"'#<non-s\\.\\.\\.'$" exn-msg)
+    (check-regexp-match #rx"'#<non-s\\.\\.\\.'$" exn-msg))
+
+  (test-case "current-cache-keys/parameter"
+    (reset-file! data1)
+
+    (define-values (count count++ secret-key) (make-counter))
+
+    (define k1 (list (lambda () 1)))
+    (define k2 (list (lambda () 2)))
+
+    (define v0
+      (parameterize ([*current-cache-keys* k1])
+        (with-cache data1 count++)))
+
+    (define v1
+      (parameterize ([*current-cache-keys* k1])
+        (with-cache data1 count++)))
+
+    (check-equal? (unbox count) 1)
+    (check-equal? (symbol->string v0) (symbol->string v1))
+
+    (define v1/no-key
+      (with-cache data1 count++))
+
+    (check-equal? (unbox count) 2)
+
+    (define v2
+      (parameterize ([*current-cache-keys* k2])
+        (with-cache data1 count++)))
+
+    (define v3
+      (parameterize ([*current-cache-keys* k1])
+        (with-cache data1 count++)))
+
+    (check-equal? (unbox count) 4)
+    (check-equal? (symbol->string v2) (symbol->string v3))
+  )
+
+  (test-case "current-cache-keys/keyword"
+    (reset-file! data1)
+
+    (define-values (count count++ secret-key) (make-counter))
+
+    (define k1 (list (lambda () 1)))
+    (define k2 (list (lambda () 2)))
+
+    (define v0
+      (with-cache data1 count++ #:keys k1))
+
+    (define v1
+      (with-cache data1 count++ #:keys k1))
+
+    (check-equal? (unbox count) 1)
+    (check-equal? (symbol->string v0) (symbol->string v1))
+
+    (define v1/no-key
+      (with-cache data1 count++ #:read (lambda (x) x) #:keys '()))
+
+    (check-equal? (unbox count) 2)
+
+    (define v2
+      (with-cache data1 count++ #:keys k2))
+
+    (define v3
+      (with-cache data1 count++ #:keys k1))
+
+    (check-equal? (unbox count) 4)
+    (check-equal? (symbol->string v2) (symbol->string v3))
   )
 )
