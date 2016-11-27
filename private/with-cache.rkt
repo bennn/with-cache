@@ -102,7 +102,7 @@
         (let ([r (thunk)])
           (when use?
             (define val-to-write
-              (with-handlers ([exn:fail? (λ (exn) (raise-user-error 'with-cache "Internal error: failed to make writable value from result '~a'" r))])
+              (with-handlers ([exn:fail? (λ (exn) (raise-user-error 'with-cache "Internal error: failed to make writable value from result '~e'" r))])
                 (write-proc r)))
             (log-with-cache-info "writing cachefile '~a'" cache-file)
             (with-handlers ([exn:fail? (cache-write-error cachefile)])

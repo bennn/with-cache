@@ -137,4 +137,15 @@
     (check-equal? (unbox num-calls) 2)
   )
 
+  (test-case "with-cache:truncate-long-values"
+    (struct non-serializable-structure-with-long-name ())
+
+    (define exn-msg
+      (parameterize ([error-print-width 10])
+        (with-handlers ([exn:fail:user? (λ (exn) (exn-message exn))])
+          (with-cache "test.rktd"
+            (λ () (non-serializable-structure-with-long-name))))))
+
+    (check-regexp-match #rx"'#<non-s\\.\\.\\.'$" exn-msg)
+  )
 )
