@@ -5,7 +5,7 @@
   with-cache/private/with-cache)
 
 (define keys/c
-  (listof (or/c parameter? (-> any/c))))
+  (or/c #f (listof (or/c parameter? (-> any/c)))))
 
 (provide
   (contract-out
