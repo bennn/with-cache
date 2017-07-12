@@ -134,21 +134,34 @@
 
 (define (cache-read-error cache-file) ; (-> Path-String (-> Exception #f))
   (define msg-prefix (format "Failed to read cache file '~a'" cache-file))
-  (λ (exn)
-    (log-with-cache-error (string-append msg-prefix ", " (exn->string exn)))
-    #f))
+  (CI-case
+    (λ (exn)
+      (log-with-cache-info (string-append msg-prefix ", " (exn->string exn)))
+      #f)
+    (λ (exn)
+      (log-with-cache-error (string-append msg-prefix ", " (exn->string exn)))
+      #f)))
 
 (define (cache-write-error cache-file) ; (-> Path-String (-> Exception #f))
   (define msg-prefix (format "Failed to write cache file '~a'" cache-file))
   (define err-prefix (format "Internal error: failed to delete malformed cache file '~a'" cache-file))
-  (λ (exn)
-    (log-with-cache-error (string-append msg-prefix ", " (exn->string exn)))
-    (define (err-handler e)
-      (raise-user-error 'with-cache (string-append err-prefix ", " (exn->string e))))
-    (with-handlers ([exn:fail:filesystem? err-handler])
-      (when (file-exists? cache-file)
-        (delete-file cache-file)))
-    #f))
+  (CI-case
+    (λ (exn)
+      (log-with-cache-info (string-append msg-prefix ", " (exn->string exn)))
+      (define (err-handler e)
+        (raise-user-error 'with-cache (string-append err-prefix ", " (exn->string e))))
+      (with-handlers ([exn:fail:filesystem? err-handler])
+        (when (file-exists? cache-file)
+          (delete-file cache-file)))
+      #f)
+    (λ (exn)
+      (log-with-cache-error (string-append msg-prefix ", " (exn->string exn)))
+      (define (err-handler e)
+        (raise-user-error 'with-cache (string-append err-prefix ", " (exn->string e))))
+      (with-handlers ([exn:fail:filesystem? err-handler])
+        (when (file-exists? cache-file)
+          (delete-file cache-file)))
+      #f)))
 
 (define (call-with-atomic-input-file filename success-proc)
   (call/atomic filename (λ () (call-with-input-file filename success-proc))))
@@ -197,6 +210,9 @@
   (for/list ([t (in-list key-thunks)])
     (t)))
 
+(define-syntax-rule (CI-case a b)
+  (if (equal? "true" (getenv "CI")) a b))
+
 ;; =============================================================================
 
 (module+ test
@@ -229,6 +245,11 @@
 
   (define-runtime-path test-file "./atomic-test-file.rktd")
 
+  (define ERROR-LEVEL
+    (CI-case
+      'info
+      'error))
+
   (test-case "exn->string"
     (define (check-exn->string msg exn)
       (let ([str (exn->string exn)])
@@ -239,7 +260,6 @@
     (check-exn->string msg1 exn1)
     (check-exn->string msg/filesystem exn/filesystem))
 
-  ;; TODO test passes, but prints to the default logger. No bueno.
   (test-case "cache-read-error"
 
     (define (check-cache-read-error cachefile exn)
@@ -247,8 +267,8 @@
         (intercept-with-cache-log
           (lambda ()
             (check-false ((cache-read-error cachefile) exn)))
-          'error))
-      (define errs (hash-ref logs 'error))
+          ERROR-LEVEL))
+      (define errs (hash-ref logs ERROR-LEVEL))
       (check-equal? (length errs) 1)
       (define msg (car errs))
       (check-true (string-contains? msg "Failed to read"))
@@ -265,8 +285,8 @@
         (intercept-with-cache-log
           (lambda ()
             (check-false ((cache-write-error cachefile) exn)))
-          'error))
-      (define errs (hash-ref logs 'error))
+          ERROR-LEVEL))
+      (define errs (hash-ref logs ERROR-LEVEL))
       (check-equal? (length errs) 1)
       (define msg (car errs))
       (check-true (string-contains? msg "Failed to write"))
