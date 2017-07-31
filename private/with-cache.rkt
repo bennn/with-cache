@@ -56,18 +56,14 @@
 (define (get-package-version)
   ((get-info '("with-cache")) 'version))
 
-(define null-dir (gensym 'uninitialized))
 (define no-keys (string->symbol (string-append "no-keys:" (get-package-version))))
 
 (define *use-cache?* (make-parameter #t))
 (define *with-cache-fasl?* (make-parameter #t))
-(define *current-cache-directory* (make-parameter null-dir))
+(define *current-cache-directory* (make-parameter (build-path (current-directory) "compiled")))
 (define *current-cache-keys* (make-parameter (list get-package-version)))
 
 (define-logger with-cache)
-
-(define (null-dir? x)
-  (eq? x null-dir))
 
 (define (no-keys? x)
   (eq? x no-keys))
@@ -75,18 +71,7 @@
 ;; -----------------------------------------------------------------------------
 
 (define (cachefile ps)
-  (if (not (null-dir? (*current-cache-directory*)))
-    (build-path (*current-cache-directory*) ps)
-    (let* ([cwd (current-directory)]
-           [compiled (build-path cwd "compiled")]
-           [wc (build-path compiled "with-cache")])
-      (cond
-       [(not (directory-exists? compiled))
-        (build-path cwd ps)]
-       [else
-        (unless (directory-exists? wc)
-          (make-directory wc))
-        (build-path wc ps)]))))
+  (build-path (*current-cache-directory*) ps))
 
 (define (with-cache cache-file
                     thunk

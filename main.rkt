@@ -19,7 +19,7 @@
      (parameter/c boolean?)]
 
     [*current-cache-directory*
-     (parameter/c path-string?)]
+     (parameter/c (and/c path-string? directory-exists?))]
 
     [*current-cache-keys*
      (parameter/c keys/c)]

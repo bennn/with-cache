@@ -140,7 +140,7 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
   Note that byte strings written using @racket[s-exp->fasl] cannot be read by code running a different version of Racket.
 }
 
-@defparam[*current-cache-directory* cache-dir boolean? #:value "./compiled/with-cache"]{
+@defparam[*current-cache-directory* cache-dir (and/c path-string? directory-exists?) #:value (build-path (current-directory) "compiled")]{
   The value of this parameter is the prefix of paths returned by @racket[cachefile].
   Another good default is @racket[(find-system-path 'temp-dir)].
 }
