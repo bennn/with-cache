@@ -71,7 +71,10 @@
 ;; -----------------------------------------------------------------------------
 
 (define (cachefile ps)
-  (build-path (*current-cache-directory*) ps))
+  (define ccd (*current-cache-directory*))
+  (unless (directory-exists? ccd)
+    (make-directory ccd))
+  (build-path ccd ps))
 
 (define (with-cache cache-file
                     thunk
