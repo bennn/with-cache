@@ -236,4 +236,28 @@
     (check-equal? (symbol->string v2) (symbol->string v3))
   )
 
+  (test-case "current-cache-keys/custom-eq"
+    (reset-file! data1)
+
+    (define-values (count count++ secret-key) (make-counter))
+
+    (define k1 (list (lambda () 1)))
+    (define k2 (list (lambda () 2)))
+
+    (define v0
+      (with-cache data1 count++ #:keys k1))
+
+    (define v1
+      (with-cache data1 count++ #:keys k1 #:keys-equal? (λ (x y) #f)))
+
+    (check-equal? (unbox count) 2)
+    (check-equal? (symbol->string v0) (symbol->string v1))
+
+    (define v1+
+      (with-cache data1 count++ #:keys k1 #:keys-equal? (λ (x y) (andmap = x y))))
+
+    (check-equal? (unbox count) 2)
+    (check-equal? (symbol->string v1) (symbol->string v1+))
+  )
+
 )

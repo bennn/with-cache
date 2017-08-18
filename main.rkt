@@ -7,7 +7,13 @@
 (define keys/c
   (or/c #f (listof (or/c parameter? (-> any/c)))))
 
+(define equivalence/c
+  (flat-named-contract "equivalence/c"
+    (and/c procedure? (procedure-arity-includes/c 2))))
+
 (provide
+  equivalence/c
+
   (contract-out
     [with-cache-logger
      logger?]
@@ -24,6 +30,9 @@
     [*current-cache-keys*
      (parameter/c keys/c)]
 
+    [*keys-equal?*
+     (parameter/c equivalence/c)]
+
     [cachefile
      (-> path-string? parent-directory-exists?)]
 
@@ -32,6 +41,7 @@
           [#:use-cache? boolean?
            #:fasl? boolean?
            #:keys keys/c
+           #:keys-equal? equivalence/c
            #:read (-> any/c any)
            #:write (-> any/c any)]
           any)]))

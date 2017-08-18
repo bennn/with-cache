@@ -21,6 +21,10 @@
   ;; (Parameterof (U #f (Listof (Parameterof Any))))
   ;; List of keys to query when reading/writing the cache
 
+  *keys-equal?*
+  ;; (Parameterof equivalence/c)
+  ;; Use to override the way `with-cache` checks that keys are equal.
+
   cachefile
   ;; (cachefile ps)
   ;; Prefix the path string `ps` with the current value of `*CACHE-DIRECTORY*`
@@ -62,6 +66,7 @@
 (define *with-cache-fasl?* (make-parameter #t))
 (define *current-cache-directory* (make-parameter (build-path (current-directory) "compiled" "with-cache")))
 (define *current-cache-keys* (make-parameter (list get-package-version)))
+(define *keys-equal?* (make-parameter equal?))
 
 (define-logger with-cache)
 
@@ -81,10 +86,11 @@
                     #:use-cache? [use? (*use-cache?*)]
                     #:fasl? [fasl? (*with-cache-fasl?*)]
                     #:keys [keys (*current-cache-keys*)]
+                    #:keys-equal? [keys-equal? (*keys-equal?*)]
                     #:read [read-proc deserialize]
                     #:write [write-proc serialize])
   (let* (;; resolve read&write functions
-         [read-proc (read/keys read-proc keys)]
+         [read-proc (read/keys read-proc keys keys-equal?)]
          [write-proc (write/keys write-proc keys)])
     (or ;; -- read from cachefile
         (and use?
@@ -175,12 +181,12 @@
        (let ([dir (path-only ps)])
          (or (not dir) (directory-exists? dir)))))
 
-(define (read/keys read-proc keys)
+(define (read/keys read-proc keys keys-equal?)
   (if (and keys (not (null? keys)))
     (λ (v)
       (and (pair? v)
            (list? (car v))
-           (equal? (car v) (keys->vals keys))
+           (keys-equal? (car v) (keys->vals keys))
            (read-proc (cdr v))))
     (λ (v)
       (and (pair? v)
@@ -305,11 +311,11 @@
       (cons no-keys x))
 
     (check-equal?
-      ((read/keys (λ (_) x) (list)) (cons no-keys y))
+      ((read/keys (λ (_) x) (list) equal?) (cons no-keys y))
       x)
 
     (check-equal?
-      ((read/keys (λ (_) x) (list)) y)
+      ((read/keys (λ (_) x) (list) equal?) y)
       #f))
 
   (test-case "read+write/keys:some-keys"
@@ -323,9 +329,9 @@
 
     (define v0 ((write/keys id good-keys) x))
     (check-not-equal? v0 x)
-    (check-equal? ((read/keys id good-keys) v0) x)
+    (check-equal? ((read/keys id good-keys equal?) v0) x)
 
-    (check-false ((read/keys id bad-keys) v0) x))
+    (check-false ((read/keys id bad-keys equal?) v0) x))
 
   (test-case "keys->vals"
     (define v0 #t)

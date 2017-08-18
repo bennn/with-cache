@@ -36,7 +36,7 @@ Here's a diagram of what's happening in @racket[with-cache]:
                                            (vc-append (hc-append (arrowhead head-size pi) arrow-line)
                                                       (text bot '() 15))))]
         [all (hc-append val-pict (arrows "#:write" "#:read")
-                        ser-pict (arrows "add-keys" "check-keys")
+                        ser-pict (arrows "add-keys" "keys-equal?")
                         key-pict (arrows "write-data" "read-data")
                         fil-pict)]
         )
@@ -64,8 +64,8 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
     They default to @racket[serialize] and @racket[deserialize].
   }
   @item{
-    @racket[add-keys] and @racket[check-keys] are hidden functions.
-    The parameter @racket[*current-cache-keys*] declares the keys.
+    @racket[add-keys] is a hidden function that adds the value of @racket[*current-cache-keys*] to a cached value.
+    @racket[keys-equal?] compares the keys in a cache file to the now-current value of @racket[*current-cache-keys*].
   }
   @item{
     @racket[write-data] and @racket[read-data] are @racket[s-exp->fasl] and @racket[fasl->s-exp] when the parameter @racket[*with-cache-fasl?*] is @racket[#t].
@@ -80,7 +80,8 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
                      [#:write write-proc (-> any/c any) serialize]
                      [#:use-cache? use-cache? boolean? (*use-cache?*)]
                      [#:fasl? fasl? boolean? (*with-cache-fasl?*)]
-                     [#:keys keys (or/c #f (listof (or/c parameter? (-> any/c)))) (*current-cache-keys*)])
+                     [#:keys keys (or/c #f (listof (or/c parameter? (-> any/c)))) (*current-cache-keys*)]
+                     [#:keys-equal? keys-equal? equivalence/c (*keys-equal?*)])
                      any]{
   If @racket[cache-path] exists:
   @nested[#:style 'inset]{@itemlist[#:style 'ordered
@@ -88,7 +89,8 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
       reads the contents of @racket[cache-path] (using @racket[s-exp->fasl] if @racket[*with-cache-fasl?*] is @racket[#t] and @racket[read] otherwise);
     }
     @item{
-      checks whether the result contains keys matching @racket[*current-cache-keys*];
+      checks whether the result contains keys equal to @racket[*current-cache-keys*],
+       where "equal" is determined by @racket[keys-equal?];
     }
     @item{
       if so, removes the keys and deserializes a value.
@@ -172,12 +174,39 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
 
 }
 
+@defparam[*keys-equal?* =? equivalence/c #:value equal?]{
+  Used to check whether a cache file is invalid.
+
+  A cache is invalid if @racket[(=? _old-keys (*current-cache-keys*))] returns @racket[#false].
+
+  By convention, the function bound to @racket[=?] should be an equivalence relation.
+  An equivalence relation obeys the following 3 laws:
+  @itemlist[
+  @item{
+    @racket[(=? k k)] returns a true value for all @racket[k];
+  }
+  @item{
+    @racket[(=? k1 k2)] returns the same value as @racket[(=? k2 k1)]; and
+  }
+  @item{
+    @racket[(and (=? k1 k2) (=? k2 k3))] implies @racket[(=? k1 k3)] is true.
+  }
+  ]
+
+  The contract @racket[equivalence/c] does not enforce these laws,
+   but it might in the future.
+}
+
 
 @section{Utilities}
 
 @defproc[(cachefile [filename path-string?]) path-string?]{
   Prefix @racket[filename] with the value of @racket[*current-cache-directory*].
   By contract, this function returns only paths whose parent directory exists.
+}
+
+@defproc[(equivalence/c [x any/c]) boolean?]{
+  Flat contract for functions that implement equivalence relations.
 }
 
 @defthing[with-cache-logger logger?]{
