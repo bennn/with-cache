@@ -42,7 +42,7 @@
 )
 
 (require
-  (only-in racket/file file->value call-with-file-lock/timeout make-lock-file-name)
+  (only-in racket/file file->value call-with-file-lock/timeout make-lock-file-name make-directory*)
   (only-in racket/path path-only)
   (only-in racket/date date-display-format current-date date->string)
   (only-in racket/serialize serialize deserialize)
@@ -60,7 +60,7 @@
 
 (define *use-cache?* (make-parameter #t))
 (define *with-cache-fasl?* (make-parameter #t))
-(define *current-cache-directory* (make-parameter (build-path (current-directory) "compiled")))
+(define *current-cache-directory* (make-parameter (build-path (current-directory) "compiled" "with-cache")))
 (define *current-cache-keys* (make-parameter (list get-package-version)))
 
 (define-logger with-cache)
@@ -73,7 +73,7 @@
 (define (cachefile ps)
   (define ccd (*current-cache-directory*))
   (unless (directory-exists? ccd)
-    (make-directory ccd))
+    (make-directory* ccd))
   (build-path ccd ps))
 
 (define (with-cache cache-file
