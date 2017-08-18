@@ -14,6 +14,10 @@
 (provide
   equivalence/c
 
+  get-with-cache-version
+
+  parent-directory-exists?
+
   (contract-out
     [with-cache-logger
      logger?]

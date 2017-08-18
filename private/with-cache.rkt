@@ -43,6 +43,10 @@
   with-cache-logger
   ;; Logger
   ;; Your trusted source for information about the inner workings of `with-cache`
+
+  get-with-cache-version
+  ;; (-> valid-version?)
+  ;; Return version of this package.
 )
 
 (require
@@ -57,15 +61,15 @@
 
 ;; =============================================================================
 
-(define (get-package-version)
+(define (get-with-cache-version)
   ((get-info '("with-cache")) 'version))
 
-(define no-keys (string->symbol (string-append "no-keys:" (get-package-version))))
+(define no-keys (string->symbol (string-append "no-keys:" (get-with-cache-version))))
 
 (define *use-cache?* (make-parameter #t))
 (define *with-cache-fasl?* (make-parameter #t))
 (define *current-cache-directory* (make-parameter (build-path (current-directory) "compiled" "with-cache")))
-(define *current-cache-keys* (make-parameter (list get-package-version)))
+(define *current-cache-keys* (make-parameter (list get-with-cache-version)))
 (define *keys-equal?* (make-parameter equal?))
 
 (define-logger with-cache)
@@ -346,7 +350,7 @@
       (keys->vals (list (λ () v0) (λ () v1)))
       (list v0 v1)))
 
-  (test-case "get-package-version"
-    (check-true (valid-version? (get-package-version))))
+  (test-case "get-with-cache-version"
+    (check-true (valid-version? (get-with-cache-version))))
 
 )

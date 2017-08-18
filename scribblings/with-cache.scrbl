@@ -4,7 +4,9 @@
          pict
          (only-in racket/math pi)
          with-cache
-         (for-label with-cache racket/base racket/contract racket/fasl racket/file racket/serialize)]
+         (for-label
+           racket/base racket/contract racket/fasl racket/path
+           racket/file racket/serialize version/utils with-cache)]
 
 @title[#:tag "top"]{with-cache}
 @author[@hyperlink["https://github.com/bennn"]{Ben Greenman}]
@@ -20,6 +22,7 @@ Wrap your large computations in a thunk and let @racket[with-cache] deal with
     (with-cache (cachefile "stdfish.rktd")
       (λ () (standard-fish 100 50))))
 ]
+@margin-note{By default, any cache built by an older version of @racketmodname[with-cache] is invalid. Set @racket[*current-cache-keys*] to override this default.}
 
 Here's a diagram of what's happening in @racket[with-cache]:
 
@@ -65,6 +68,8 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
   }
   @item{
     @racket[add-keys] is a hidden function that adds the value of @racket[*current-cache-keys*] to a cached value.
+  }
+  @item{
     @racket[keys-equal?] compares the keys in a cache file to the now-current value of @racket[*current-cache-keys*].
   }
   @item{
@@ -147,12 +152,16 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
   Another good default is @racket[(find-system-path 'temp-dir)].
 }
 
-@defparam[*current-cache-keys* params (or/c #f (listof (or/c parameter? (-> any/c)))) #:value #f]{
-  List of parameters or thunks to validate cachefiles with.
-  The values in @racket[*current-cache-keys*] are @emph{computations}.
-  We run these computations once before writing a cache file and save the result.
-  We run these computations again when reading the cache file; if the new results match the saved results, the cache file is valid.
-  Otherwise, the cache file is outdated and @racket[with-cache] will discard it.
+@defparam[*current-cache-keys* params (or/c #f (listof (or/c parameter? (-> any/c)))) #:value (list get-with-cache-version)]{
+  List of parameters (or thunks) used to check when a cache is invalid.
+
+  Before writing a cache file, @racket[with-cache] gets the value of @racket[*current-cache-keys*]
+   (by taking the value of the parameters and forcing the thunks)
+   and writes the result to the file.
+  When reading a cache file, @racket[with-cache] gets the current value of @racket[*current-cache-keys*]
+   and compares this value to the value written in the cache file.
+  If the current keys are NOT equal to the old keys (equal in the sense of @racket[*keys-equal?*]),
+   then the cache is invalid.
 
   For example, @racket[(*current-cache-keys* (list current-seconds))] causes
    @racket[with-cache] to ignore cachefiles written more than 1 second ago.
@@ -170,26 +179,28 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
     (fresh-fish) ;; Writes to "compiled/with-cache/stdfish.rktd"
   ))
 
-  By default, the only key is a thunk that retrieves the installed version of the @racket[with-cache] package.
+  By default, the only key is a thunk that retrieves the installed version of
+   the @racket[with-cache] package.
 
 }
 
 @defparam[*keys-equal?* =? equivalence/c #:value equal?]{
   Used to check whether a cache file is invalid.
 
-  A cache is invalid if @racket[(=? _old-keys (*current-cache-keys*))] returns @racket[#false].
+  A cache is invalid if @racket[(=? _old-keys _current-keys)] returns @racket[#false],
+   where @racket[_current-keys] is the current value of @racket[*current-cache-keys*].
 
-  By convention, the function bound to @racket[=?] should be an equivalence relation.
-  An equivalence relation obeys the following 3 laws:
+  By convention, the function bound to @racket[=?] should be an equivalence,
+   meaning it obeys the following 3 laws:
   @itemlist[
   @item{
-    @racket[(=? k k)] returns a true value for all @racket[k];
+    @racket[(=? _k _k)] returns a true value for all @racket[_k];
   }
   @item{
-    @racket[(=? k1 k2)] returns the same value as @racket[(=? k2 k1)]; and
+    @racket[(=? _k1 _k2)] returns the same value as @racket[(=? _k2 _k1)]; and
   }
   @item{
-    @racket[(and (=? k1 k2) (=? k2 k3))] implies @racket[(=? k1 k3)] is true.
+    @racket[(and (=? _k1 _k2) (=? _k2 _k3))] implies @racket[(=? _k1 _k3)] is true.
   }
   ]
 
@@ -200,13 +211,21 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
 
 @section{Utilities}
 
-@defproc[(cachefile [filename path-string?]) path-string?]{
+@defproc[(cachefile [filename path-string?]) parent-directory-exists?]{
   Prefix @racket[filename] with the value of @racket[*current-cache-directory*].
   By contract, this function returns only paths whose parent directory exists.
 }
 
+@defproc[(parent-directory-exists? [x any/c]) boolean?]{
+  Flat contract that checks whether @racket[(path-only x)] exists.
+}
+
 @defproc[(equivalence/c [x any/c]) boolean?]{
   Flat contract for functions that implement equivalence relations.
+}
+
+@defproc[(get-with-cache-version) valid-version?]{
+  Return the current version of @racket[with-cache].
 }
 
 @defthing[with-cache-logger logger?]{
