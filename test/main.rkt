@@ -69,6 +69,19 @@
       (check-equal? (with-cache data1 f) result)
       (check-equal? (unbox num-calls) 2)))
 
+  (test-case "cache-ref"
+    (reset-file! data1)
+
+    (define-values (num-calls f result) (make-counter))
+
+    (check-false (file-exists? data1))
+    (check-equal? (cache-ref data1 f) result)
+    (check-true (file-exists? data1))
+    (let ([v (cache-ref data1 f)])
+      (check-not-equal? v result)
+      (check-equal? (symbol->string v) (symbol->string result)))
+    (check-equal? (unbox num-calls) 1))
+
   (test-case "with-cache:*use-cache?*=#f/keyword"
     (reset-file! data1)
 

@@ -125,6 +125,16 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
 
 }
 
+@defproc[(cache-ref [cache-path path-string?]
+                    [thunk (-> any)]
+                    [#:read read-proc (-> any/c any) deserialize]
+                    [#:write write-proc (-> any/c any) serialize]
+                    [#:use-cache? use-cache? boolean? (*use-cache?*)]
+                    [#:fasl? fasl? boolean? (*with-cache-fasl?*)]
+                    [#:keys keys (or/c #f (listof (or/c parameter? (-> any/c)))) (*current-cache-keys*)])
+                    any]{
+  Alias for @racket[with-cache].}
+
 
 @section{Parameters}
 
