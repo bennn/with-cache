@@ -233,4 +233,3 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
   Logs @racket['info] events when reading or writing caches and @racket['error] events after detecting corrupted cache files.
 }
 
-@include-section{test.scrbl}
