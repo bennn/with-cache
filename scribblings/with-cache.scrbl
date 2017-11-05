@@ -10,6 +10,7 @@
 
 @title[#:tag "top"]{with-cache}
 @author[@hyperlink["https://github.com/bennn"]{Ben Greenman}]
+@view-source[]
 
 @defmodule[with-cache]
 
@@ -150,6 +151,7 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
 @defparam[*current-cache-directory* cache-dir (and/c path-string? directory-exists?) #:value (build-path (current-directory) "compiled" "with-cache")]{
   The value of this parameter is the prefix of paths returned by @racket[cachefile].
   Another good default is @racket[(find-system-path 'temp-dir)].
+  See also the @other-doc['(lib "basedir/basedir.scrbl")].
 }
 
 @defparam[*current-cache-keys* params (or/c #f (listof (or/c parameter? (-> any/c)))) #:value (list get-with-cache-version)]{
