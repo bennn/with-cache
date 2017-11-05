@@ -10,7 +10,6 @@
 
 @title[#:tag "top"]{with-cache}
 @author[@hyperlink["https://github.com/bennn"]{Ben Greenman}]
-@view-source[]
 
 @defmodule[with-cache]
 
