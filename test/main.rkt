@@ -82,25 +82,26 @@
   (test-case "with-cache:fasl=#t/parameter"
     (reset-file! data1)
 
+    (define the-value 4)
+
     (check-false (file-exists? data1))
     (parameterize ([*with-cache-fasl?* #t])
-      (with-cache data1 (λ () 4)))
+      (with-cache data1 (λ () the-value)))
     (check-true (file-exists? data1))
 
-    (with-handlers ([exn:fail:read? void])
-      (with-input-from-file data1 read)
-      (raise-user-error 'with-cache:test "Error: `read` should have failed.")))
+    (define new-value (with-input-from-file data1 read))
+    (check-false (equal? new-value the-value)))
 
   (test-case "with-cache:fasl=#t/keyword"
     (reset-file! data1)
+    (define the-value 4)
 
     (check-false (file-exists? data1))
-    (with-cache data1 (λ () 4) #:fasl? #t)
+    (with-cache data1 (λ () the-value) #:fasl? #t)
     (check-true (file-exists? data1))
 
-    (with-handlers ([exn:fail:read? void])
-      (with-input-from-file data1 read)
-      (raise-user-error 'with-cache:test "Error: `read` should have failed.")))
+    (define new-value (with-input-from-file data1 read))
+    (check-false (equal? new-value the-value)))
 
   (test-case "with-cache:fasl=#f"
     (reset-file! data1)
