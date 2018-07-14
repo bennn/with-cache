@@ -89,7 +89,9 @@
       (with-cache data1 (λ () the-value)))
     (check-true (file-exists? data1))
 
-    (define new-value (with-input-from-file data1 read))
+    (define new-value
+      (parameterize ([read-accept-compiled #true])
+        (with-input-from-file data1 read)))
     (check-false (equal? new-value the-value)))
 
   (test-case "with-cache:fasl=#t/keyword"
@@ -100,7 +102,9 @@
     (with-cache data1 (λ () the-value) #:fasl? #t)
     (check-true (file-exists? data1))
 
-    (define new-value (with-input-from-file data1 read))
+    (define new-value
+      (parameterize ([read-accept-compiled #true])
+        (with-input-from-file data1 read)))
     (check-false (equal? new-value the-value)))
 
   (test-case "with-cache:fasl=#f"
@@ -114,7 +118,10 @@
     (check-true (file-exists? data1))
 
     (with-handlers ([exn:fail:read? (λ (exn) (raise-user-error 'with-cache:test "Error reading, got exception '~a'" (exn-message exn)))])
-      (check-true (and (with-input-from-file data1 read) #t))))
+      (check-true (and
+                    (parameterize ([read-accept-compiled #true])
+                      (with-input-from-file data1 read))
+                    #t))))
 
   (test-case "with-cache:read/write"
     (reset-file! data1)
