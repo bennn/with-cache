@@ -230,7 +230,7 @@ The @racket[with-cache] function implements this pipeline and provides hooks for
 }
 
 @defthing[with-cache-logger logger?]{
-  A @tech[#:doc '(lib "scribblings/reference/reference.scrbl")]{logger} that reports events from the @racket[with-cache] library.
+  A @tech[#:doc '(lib "scribblings/reference/reference.scrbl")]{logger} that reports events from the @racketmodname[with-cache] library.
   Logs @racket['info] events when reading or writing caches and @racket['error] events after detecting corrupted cache files.
 }
 
