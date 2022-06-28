@@ -336,7 +336,7 @@
     (check-not-equal? v0 x)
     (check-equal? ((read/keys id good-keys equal?) v0) x)
 
-    (check-false ((read/keys id bad-keys equal?) v0) x))
+    (check-false ((read/keys id bad-keys equal?) v0)))
 
   (test-case "keys->vals"
     (define v0 #t)
